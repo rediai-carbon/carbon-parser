@@ -3,6 +3,8 @@
 #pragma once
 
 #include <cstdint>
+#include <cstring>
+#include <algorithm>
 #include <array>
 #include <memory>
 #include <optional>

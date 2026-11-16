@@ -60,8 +60,10 @@ uint32_t BitScan( uint64_t mask )
 	unsigned long idx = 0;
 	_BitScanForward64( &idx, mask );
 	return uint32_t( idx );
-#elif __APPLE__
+#elif defined( __APPLE__ ) || defined( __linux__ )
 	return uint32_t( __builtin_ctzll( mask ) );
+#else
+#error Unsupported platform
 #endif
 }
 
