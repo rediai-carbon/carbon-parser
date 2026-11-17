@@ -4,6 +4,7 @@
 #include "../include/ccpparser.h"
 #include "helpers.h"
 
+#include <string>
 #include <vector>
 
 using namespace CcpParser;
@@ -15,19 +16,16 @@ float Add8( float a, float b, float c, float d, float e, float f, float g, float
 	return a + b + c + d + e + f + g + h;
 }
 
-float Sub2( float x, float y )
-{
-	return x - y;
-}
-
-size_t ArenaSize( const char* expression, const std::vector<Function>& functions )
+size_t ArenaSize( const char* expression, const std::vector<Variable>& variables, const std::vector<Function>& functions )
 {
 	Externals externals;
-	FunctionView funcs[] = { functions };
-	externals.functions = funcs;
+	VariableView variablesView[] = { variables };
+	FunctionView functionsView[] = { functions };
+	externals.variables = variablesView;
+	externals.functions = functionsView;
 	Program program;
-	auto parsed = Parse( expression, externals, program );
-	EXPECT_TRUE( parsed );
+	const auto parsed = Parse( expression, externals, program );
+	EXPECT_TRUE( parsed ) << expression;
 	return program.GetTempArenaSize();
 }
 
@@ -37,7 +35,7 @@ std::string NestedAdds( int depth )
 	{
 		return "0";
 	}
-	std::string expression = "wide(1+1,1+1,1+1,1+1,1+1,1+1,1+1,";
+	std::string expression = "wide(a+1,a+1,a+1,a+1,a+1,a+1,a+1,";
 	expression += NestedAdds( depth - 1 );
 	expression += ")";
 	return expression;
@@ -46,12 +44,16 @@ std::string NestedAdds( int depth )
 
 TEST( Temps, NonzeroMasksUseDistinctSlots )
 {
-	ASSERT_EQ( sizeof( float ), ArenaSize( "1+2", {} ) );
-	ASSERT_EQ( 3 * sizeof( float ), ArenaSize( "gap(1+2, 3+4)", { Function( "gap", &Sub2 ) } ) );
+	const std::vector<Variable> variables = { { "a", 0, 0 } };
+	// Nine or more simultaneous temps are visible. GetTempArenaSize reports 0
+	// for an arena of 32 bytes or less because Eval keeps that buffer itself.
+	ASSERT_EQ( 15 * sizeof( float ), ArenaSize( NestedAdds( 2 ).c_str(), variables, { Function( "wide", &Add8 ) } ) );
+	ASSERT_EQ( 3.f, TestEval( "a + 1", { { "a", 2.f } } ) );
 }
 
 TEST( Temps, ZeroMaskReusesTheLowestSlot )
 {
+	const std::vector<Variable> variables = { { "a", 0, 0 } };
 	const auto functions = std::vector<Function>{ Function( "wide", &Add8 ) };
-	ASSERT_EQ( 64 * sizeof( float ), ArenaSize( NestedAdds( 10 ).c_str(), functions ) );
+	ASSERT_EQ( 64 * sizeof( float ), ArenaSize( NestedAdds( 10 ).c_str(), variables, functions ) );
 }
