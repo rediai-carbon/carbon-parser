@@ -56,12 +56,21 @@ CcpParser::OpCode GetBinaryOpCode( int tokenType )
 
 uint32_t BitScan( uint64_t mask )
 {
+	// Exhaustion leaves a zero mask. _BitScanForward64 then keeps the
+	// initialized index of 0. __builtin_ctzll(0) is undefined, so the
+	// zero result is explicit and matches that existing result.
+	if( mask == 0 )
+	{
+		return 0;
+	}
 #if _WIN32
 	unsigned long idx = 0;
 	_BitScanForward64( &idx, mask );
 	return uint32_t( idx );
-#elif __APPLE__
+#elif defined( __APPLE__ ) || defined( __linux__ )
 	return uint32_t( __builtin_ctzll( mask ) );
+#else
+#error Unsupported platform
 #endif
 }
 

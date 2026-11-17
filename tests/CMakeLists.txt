@@ -8,6 +8,7 @@ ccp_add_executable(CcpParserTest
     helpers.cpp
     operators.cpp
     pch.cpp
+    temps.cpp
     variables.cpp
 )
 target_sources(CcpParserTest PRIVATE
