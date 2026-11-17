@@ -140,3 +140,10 @@ TEST(Operators, CanUseConditionals)
 	ASSERT_EQ(4.f, TestEval("t(x) ? 1+x+2 : 4+x", { {"x", 1} }, { Function("t", &test1) }));
 	ASSERT_EQ(5.f, TestEval("t(x)-2 ? 1+x+2 : 4+x", { {"x", 1} }, { Function("t", &test1) }));
 }
+
+TEST(Operators, UnalignedOperandsKeepTheirValues)
+{
+	ASSERT_EQ(7, TestEval("3 + 4"));
+	ASSERT_EQ(4.f, TestEval("1 ? 4 : 5"));
+	ASSERT_EQ(5.f, TestEval("0 ? 4 : 5"));
+}

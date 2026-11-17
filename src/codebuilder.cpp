@@ -93,7 +93,9 @@ Register CodeBuilder::AddConst( float constant )
 {
 	for( uint32_t offset = 0; offset + CONST_ALIGNMENT <= uint32_t( m_constData.size() ); offset += CONST_ALIGNMENT )
 	{
-		if( *reinterpret_cast<float*>( m_constData.data() + offset ) == constant )
+		float existing = 0;
+		std::memcpy( &existing, m_constData.data() + offset, sizeof( existing ) );
+		if( existing == constant )
 		{
 			return Register{ offset, Register::CONST };
 		}
@@ -159,7 +161,7 @@ size_t CodeBuilder::AddJump( OpCode code, Register arg0 )
 void CodeBuilder::ResolveAddr( size_t offset )
 {
 	uint32_t addr = uint32_t( m_code.size() );
-	*reinterpret_cast<uint32_t*>( m_code.data() + offset ) = addr;
+	std::memcpy( m_code.data() + offset, &addr, sizeof( addr ) );
 }
 
 Register CodeBuilder::AllocateTemp()
