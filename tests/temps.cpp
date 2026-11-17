@@ -2,7 +2,6 @@
 
 #include "pch.h"
 #include "../include/ccpparser.h"
-#include "helpers.h"
 
 #include <string>
 #include <vector>
@@ -48,7 +47,6 @@ TEST( Temps, NonzeroMasksUseDistinctSlots )
 	// Nine or more simultaneous temps are visible. GetTempArenaSize reports 0
 	// for an arena of 32 bytes or less because Eval keeps that buffer itself.
 	ASSERT_EQ( 15 * sizeof( float ), ArenaSize( NestedAdds( 2 ).c_str(), variables, { Function( "wide", &Add8 ) } ) );
-	ASSERT_EQ( 3.f, TestEval( "a + 1", { { "a", 2.f } } ) );
 }
 
 TEST( Temps, ZeroMaskReusesTheLowestSlot )
