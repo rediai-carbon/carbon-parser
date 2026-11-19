@@ -8,26 +8,46 @@
 namespace
 {
 template <typename T>
-const T& Read( const uint8_t*& code )
+T Read( const uint8_t*& code )
 {
-	auto& t = *reinterpret_cast<const T*>( code );
+	// Operands follow a one-byte opcode, so their address is not aligned for T.
+	T value;
+	std::memcpy( &value, code, sizeof( T ) );
 	code += sizeof( T );
-	return t;
+	return value;
+}
+
+uint8_t* RegisterBytes( const uint8_t*& code, const void* constants, const void* temps, void** externals )
+{
+	auto reg = Read<CcpParser::Register>( code );
+	const uint8_t* base = nullptr;
+	switch( reg.type )
+	{
+	case CcpParser::Register::CONST:
+		base = static_cast<const uint8_t*>( constants );
+		break;
+	case CcpParser::Register::TEMP:
+		base = static_cast<const uint8_t*>( temps );
+		break;
+	default:
+		base = static_cast<const uint8_t*>( externals[reg.type - 2] );
+		break;
+	}
+	return const_cast<uint8_t*>( base + reg.offset );
 }
 
 template <typename T>
 T& FetchRegister( const uint8_t*& code, const void* constants, const void* temps, void** externals )
 {
-	auto& reg = Read<CcpParser::Register>( code );
-	switch( reg.type )
-	{
-	case CcpParser::Register::CONST:
-		return *(T*)( static_cast<const uint8_t*>( constants ) + reg.offset );
-	case CcpParser::Register::TEMP:
-		return *(T*)( static_cast<const uint8_t*>( temps ) + reg.offset );
-	default:
-		return *(T*)( static_cast<const uint8_t*>( externals[reg.type - 2] ) + reg.offset );
-	}
+	return *reinterpret_cast<T*>( RegisterBytes( code, constants, temps, externals ) );
+}
+
+template <typename T>
+T LoadRegister( const uint8_t*& code, const void* constants, const void* temps, void** externals )
+{
+	T value;
+	std::memcpy( &value, RegisterBytes( code, constants, temps, externals ), sizeof( T ) );
+	return value;
 }
 }
 
@@ -162,7 +182,7 @@ float Program::Eval( void** externData, void* tempArena ) const
 			break;
 		}
 		case OpCode::CALL: {
-			const auto& f = FetchRegister<PackedFunction>( code, m_code.data(), tempArena, externData );
+			auto f = LoadRegister<PackedFunction>( code, m_code.data(), tempArena, externData );
 			auto& dest = FetchRegister<float>( code, m_code.data(), tempArena, externData );
 			void** ctx = reinterpret_cast<void**>( static_cast<uint8_t*>( externData[f.ctxBuffer] ) + f.ctxOffset );
 			const char* str = nullptr;
@@ -253,7 +273,8 @@ float Program::Eval( void** externData, void* tempArena ) const
 		case OpCode::RET:
 			return FetchRegister<float>( code, m_code.data(), tempArena, externData );
 		case OpCode::JUMP: {
-			auto addr = *reinterpret_cast<const uint32_t*>( code );
+			uint32_t addr = 0;
+			std::memcpy( &addr, code, sizeof( addr ) );
 			code = m_code.data() + m_codeStart + addr;
 			break;
 		}
@@ -261,7 +282,8 @@ float Program::Eval( void** externData, void* tempArena ) const
 			auto& src0 = FetchRegister<float>( code, m_code.data(), tempArena, externData );
 			if( src0 == 0 )
 			{
-				auto addr = *reinterpret_cast<const uint32_t*>( code );
+				uint32_t addr = 0;
+				std::memcpy( &addr, code, sizeof( addr ) );
 				code = m_code.data() + m_codeStart + addr;
 			}
 			else
@@ -274,7 +296,8 @@ float Program::Eval( void** externData, void* tempArena ) const
 			auto& src0 = FetchRegister<float>( code, m_code.data(), tempArena, externData );
 			if( src0 != 0 )
 			{
-				auto addr = *reinterpret_cast<const uint32_t*>( code );
+				uint32_t addr = 0;
+				std::memcpy( &addr, code, sizeof( addr ) );
 				code = m_code.data() + m_codeStart + addr;
 			}
 			else
@@ -413,12 +436,13 @@ std::string Program::Disassemble() const
 			auto funcRef = RegisterRefFunc( code );
 			os << "  call " << funcRef << ", " << RegisterRefF( code );
 
-			auto f = reinterpret_cast<const PackedFunction*>( m_code.data() + funcRef.offset );
-			if( HasFlag( f->flags, FunctionFlags::USES_STRING_ARG ) )
+			PackedFunction f;
+			std::memcpy( &f, m_code.data() + funcRef.offset, sizeof( f ) );
+			if( HasFlag( f.flags, FunctionFlags::USES_STRING_ARG ) )
 			{
 				os << ", " << RegisterRefS( code );
 			}
-			for( uint16_t i = 0; i < f->arity; ++i )
+			for( uint16_t i = 0; i < f.arity; ++i )
 			{
 				os << ", " << RegisterRefF( code );
 			}
@@ -472,7 +496,9 @@ std::string Program::Disassemble() const
 			auto found = std::find( begin( floatConsts ), end( floatConsts ), i );
 			if( found != end( floatConsts ) )
 			{
-				constOs << "  float " << *reinterpret_cast<const float*>( m_code.data() + i ) << std::endl;
+				float number = 0;
+				std::memcpy( &number, m_code.data() + i, sizeof( number ) );
+				constOs << "  float " << number << std::endl;
 				i += PadSize( sizeof( float ) );
 				continue;
 			}
@@ -488,15 +514,16 @@ std::string Program::Disassemble() const
 			if( found != end( funcConsts ) )
 			{
 
-				auto func = reinterpret_cast<const PackedFunction*>( m_code.data() + i );
-				constOs << "  func 0x" << std::hex << func->fp << std::dec << '(';
+				PackedFunction func;
+				std::memcpy( &func, m_code.data() + i, sizeof( func ) );
+				constOs << "  func 0x" << std::hex << func.fp << std::dec << '(';
 				bool first = true;
-				if( HasFlag( func->flags, FunctionFlags::USES_CONTEXT ) )
+				if( HasFlag( func.flags, FunctionFlags::USES_CONTEXT ) )
 				{
 					constOs << "void*";
 					first = false;
 				}
-				if( HasFlag( func->flags, FunctionFlags::USES_STRING_ARG ) )
+				if( HasFlag( func.flags, FunctionFlags::USES_STRING_ARG ) )
 				{
 					if( !first )
 					{
@@ -505,7 +532,7 @@ std::string Program::Disassemble() const
 					constOs << "const char*";
 					first = false;
 				}
-				for( uint16_t j = 0; j < func->arity; ++j )
+				for( uint16_t j = 0; j < func.arity; ++j )
 				{
 					if( j || !first )
 					{
