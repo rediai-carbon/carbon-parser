@@ -47,6 +47,7 @@ target_precompile_headers(CcpParser PRIVATE src/pch.h)
 target_include_directories(CcpParser
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>
     PRIVATE
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
         ${GENERATED_SOURCES_DIR}
