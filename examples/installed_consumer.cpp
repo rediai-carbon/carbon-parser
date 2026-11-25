@@ -1,11 +1,11 @@
 // Copyright © 2026 RediAI. Out-of-tree consumer for installed carbon-parser.
-#include <ccpparser.h>
-
 #include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <memory>
 #include <vector>
+
+#include <ccpparser.h>
 
 using namespace CcpParser;
 
@@ -61,7 +61,8 @@ int main()
 		std::printf("PARSER_CONSUMER cond_fail v=%f\n", v);
 		return 1;
 	}
-	ParseResult bad = Parse("1 +", {}, Program{});
+	Program bad_program;
+	ParseResult bad = Parse("1 +", {}, bad_program);
 	if (bad.type != ParseResult::SYNTAX_ERROR)
 	{
 		std::printf("PARSER_CONSUMER invalid_expected_syntax got=%d\n", static_cast<int>(bad.type));
