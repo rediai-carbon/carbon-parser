@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.16)
+project(parser_installed_consumer LANGUAGES CXX)
+find_package(carbon-parser CONFIG REQUIRED)
+add_executable(parser_installed_consumer installed_consumer.cpp)
+target_link_libraries(parser_installed_consumer PRIVATE CcpParser)
